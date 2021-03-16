@@ -8,10 +8,13 @@ import (
 )
 
 type Config struct {
-	DB     string
-	Server *Server
-	Mysql  *Mysql
-	Sqlite *Sqlite
+	Debug         bool
+	Demo          bool
+	DB            string
+	Server        *Server
+	Mysql         *Mysql
+	Sqlite        *Sqlite
+	ResetPassword string
 }
 
 type Mysql struct {
@@ -53,6 +56,7 @@ func SetupConfig() (*Config, error) {
 	pflag.String("server.addr", "", "server listen addr")
 	pflag.String("server.cert", "", "tls cert file")
 	pflag.String("server.key", "", "tls key file")
+	pflag.String("reset-password", "", "")
 
 	pflag.Parse()
 	_ = viper.BindPFlags(pflag.CommandLine)
@@ -75,6 +79,9 @@ func SetupConfig() (*Config, error) {
 			Cert: viper.GetString("server.cert"),
 			Key:  viper.GetString("server.key"),
 		},
+		ResetPassword: viper.GetString("reset-password"),
+		Debug:         viper.GetBool("debug"),
+		Demo:          viper.GetBool("demo"),
 	}
 
 	return config, nil

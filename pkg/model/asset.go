@@ -1,6 +1,7 @@
 package model
 
 import (
+	"next-terminal/pkg/constant"
 	"next-terminal/pkg/global"
 	"next-terminal/pkg/utils"
 	"strings"
@@ -9,8 +10,8 @@ import (
 type Asset struct {
 	ID           string         `gorm:"primary_key " json:"id"`
 	Name         string         `json:"name"`
-	IP           string         `json:"ip"`
 	Protocol     string         `json:"protocol"`
+	IP           string         `json:"ip"`
 	Port         int            `json:"port"`
 	AccountType  string         `json:"accountType"`
 	Username     string         `json:"username"`
@@ -48,10 +49,25 @@ func FindAllAsset() (o []Asset, err error) {
 	return
 }
 
+func FindAssetByIds(assetIds []string) (o []Asset, err error) {
+	err = global.DB.Where("id in ?", assetIds).Find(&o).Error
+	return
+}
+
+func FindAssetByProtocol(protocol string) (o []Asset, err error) {
+	err = global.DB.Where("protocol = ?", protocol).Find(&o).Error
+	return
+}
+
+func FindAssetByProtocolAndIds(protocol string, assetIds []string) (o []Asset, err error) {
+	err = global.DB.Where("protocol = ? and id in ?", protocol, assetIds).Find(&o).Error
+	return
+}
+
 func FindAssetByConditions(protocol string, account User) (o []Asset, err error) {
 	db := global.DB.Table("assets").Select("assets.id,assets.name,assets.ip,assets.port,assets.protocol,assets.active,assets.owner,assets.created, users.nickname as owner_name,COUNT(resource_sharers.user_id) as sharer_count").Joins("left join users on assets.owner = users.id").Joins("left join resource_sharers on assets.id = resource_sharers.resource_id").Group("assets.id")
 
-	if TypeUser == account.Type {
+	if constant.TypeUser == account.Type {
 		owner := account.ID
 		db = db.Where("assets.owner = ? or resource_sharers.user_id = ?", owner, owner)
 	}
@@ -63,11 +79,11 @@ func FindAssetByConditions(protocol string, account User) (o []Asset, err error)
 	return
 }
 
-func FindPageAsset(pageIndex, pageSize int, name, protocol, tags string, account User, owner, sharer, userGroupId, ip string) (o []AssetVo, total int64, err error) {
+func FindPageAsset(pageIndex, pageSize int, name, protocol, tags string, account User, owner, sharer, userGroupId, ip, order, field string) (o []AssetVo, total int64, err error) {
 	db := global.DB.Table("assets").Select("assets.id,assets.name,assets.ip,assets.port,assets.protocol,assets.active,assets.owner,assets.created,assets.tags, users.nickname as owner_name,COUNT(resource_sharers.user_id) as sharer_count").Joins("left join users on assets.owner = users.id").Joins("left join resource_sharers on assets.id = resource_sharers.resource_id").Group("assets.id")
 	dbCounter := global.DB.Table("assets").Select("DISTINCT assets.id").Joins("left join resource_sharers on assets.id = resource_sharers.resource_id").Group("assets.id")
 
-	if TypeUser == account.Type {
+	if constant.TypeUser == account.Type {
 		owner := account.ID
 		db = db.Where("assets.owner = ? or resource_sharers.user_id = ?", owner, owner)
 		dbCounter = dbCounter.Where("assets.owner = ? or resource_sharers.user_id = ?", owner, owner)
@@ -130,7 +146,20 @@ func FindPageAsset(pageIndex, pageSize int, name, protocol, tags string, account
 	if err != nil {
 		return nil, 0, err
 	}
-	err = db.Order("assets.created desc").Offset((pageIndex - 1) * pageSize).Limit(pageSize).Find(&o).Error
+
+	if order == "ascend" {
+		order = "asc"
+	} else {
+		order = "desc"
+	}
+
+	if field == "name" {
+		field = "name"
+	} else {
+		field = "created"
+	}
+
+	err = db.Order("assets." + field + " " + order).Offset((pageIndex - 1) * pageSize).Limit(pageSize).Find(&o).Error
 
 	if o == nil {
 		o = make([]AssetVo, 0)

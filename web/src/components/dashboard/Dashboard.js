@@ -6,7 +6,7 @@ import request from "../../common/request";
 import './Dashboard.css'
 import {Link} from "react-router-dom";
 import {Area} from '@ant-design/charts';
-import Logout from "../user/Logout";
+
 import {isAdmin} from "../../service/permission";
 
 
@@ -80,16 +80,14 @@ class Dashboard extends Component {
         return (
             <>
                 <PageHeader
-                    className="site-page-header-ghost-wrapper page-herder"
+                    className="site-page-header-ghost-wrapper"
                     title="dashboard"
                     breadcrumb={{
                         routes: routes,
                         itemRender: itemRender
                     }}
                     subTitle="仪表盘"
-                    extra={[
-                        <Logout key='logout'/>
-                    ]}
+                    extra={[]}
                 >
                 </PageHeader>
 

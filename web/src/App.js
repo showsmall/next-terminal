@@ -17,12 +17,14 @@ import {
     BlockOutlined,
     CloudServerOutlined,
     CodeOutlined,
+    ControlOutlined,
     DashboardOutlined,
     DesktopOutlined,
     DisconnectOutlined,
     IdcardOutlined,
     LinkOutlined,
     LoginOutlined,
+    SafetyCertificateOutlined,
     SettingOutlined,
     SolutionOutlined,
     TeamOutlined,
@@ -37,8 +39,12 @@ import BatchCommand from "./components/command/BatchCommand";
 import {isEmpty, NT_PACKAGE} from "./utils/utils";
 import {isAdmin} from "./service/permission";
 import UserGroup from "./components/user/UserGroup";
-import LoginLog from "./components/session/LoginLog";
+import LoginLog from "./components/devops/LoginLog";
 import Term from "./components/access/Term";
+import Job from "./components/devops/Job";
+import {Header} from "antd/es/layout/layout";
+import LayoutHeader from "./components/user/LayoutHeader";
+import Security from "./components/devops/Security";
 
 const {Footer, Sider} = Layout;
 
@@ -167,17 +173,12 @@ class App extends Component {
                                             动态指令
                                         </Link>
                                     </Menu.Item>
-                                    {/*<Menu.Item key="silent-command" icon={<DeploymentUnitOutlined/>}>
-                                                <Link to={'/silent-command'}>
-                                                    静默指令
-                                                </Link>
-                                            </Menu.Item>*/}
                                 </SubMenu>
 
                                 {
                                     this.state.triggerMenu && isAdmin() ?
                                         <>
-                                            <SubMenu key='audit' title='操作审计' icon={<AuditOutlined/>}>
+                                            <SubMenu key='audit' title='会话审计' icon={<AuditOutlined/>}>
                                                 <Menu.Item key="online-session" icon={<LinkOutlined/>}>
                                                     <Link to={'/online-session'}>
                                                         在线会话
@@ -189,10 +190,25 @@ class App extends Component {
                                                         历史会话
                                                     </Link>
                                                 </Menu.Item>
+                                            </SubMenu>
+
+                                            <SubMenu key='ops' title='系统运维' icon={<ControlOutlined/>}>
 
                                                 <Menu.Item key="login-log" icon={<LoginOutlined/>}>
                                                     <Link to={'/login-log'}>
                                                         登录日志
+                                                    </Link>
+                                                </Menu.Item>
+
+                                                <Menu.Item key="job" icon={<BlockOutlined/>}>
+                                                    <Link to={'/job'}>
+                                                        计划任务
+                                                    </Link>
+                                                </Menu.Item>
+
+                                                <Menu.Item key="access-security" icon={<SafetyCertificateOutlined/>}>
+                                                    <Link to={'/access-security'}>
+                                                        访问安全
                                                     </Link>
                                                 </Menu.Item>
                                             </SubMenu>
@@ -234,10 +250,10 @@ class App extends Component {
                         </Sider>
 
                         <Layout className="site-layout">
-                            {/*<Header className="site-layout-background"
-                                        style={{padding: 0, height: 48, lineHeight: 48}}>
-
-                                </Header>*/}
+                            <Header className="site-layout-background"
+                                    style={{padding: 0, height: 48, zIndex: 20}}>
+                                <LayoutHeader key='layout-right-header'/>
+                            </Header>
 
                             <Route path="/" exact component={Dashboard}/>
                             <Route path="/user" component={User}/>
@@ -251,6 +267,8 @@ class App extends Component {
                             <Route path="/login-log" component={LoginLog}/>
                             <Route path="/info" component={Info}/>
                             <Route path="/setting" component={Setting}/>
+                            <Route path="/job" component={Job}/>
+                            <Route path="/access-security" component={Security}/>
 
                             <Footer style={{textAlign: 'center'}}>
                                 Next Terminal ©2021 dushixiang Version:{this.state.package['version']}

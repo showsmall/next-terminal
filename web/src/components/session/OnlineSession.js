@@ -24,7 +24,7 @@ import {message} from "antd/es";
 import {PROTOCOL_COLORS} from "../../common/constants";
 import {DisconnectOutlined, ExclamationCircleOutlined, SyncOutlined, UndoOutlined} from "@ant-design/icons";
 import Monitor from "../access/Monitor";
-import Logout from "../user/Logout";
+
 import dayjs from "dayjs";
 
 const confirm = Modal.confirm;
@@ -192,7 +192,7 @@ class OnlineSession extends Component {
             delBtnLoading: true
         })
         try {
-            let result = await request.post('/sessions/' + this.state.selectedRowKeys.join(',') + '/discontent');
+            let result = await request.post('/sessions/' + this.state.selectedRowKeys.join(',') + '/disconnect');
             if (result.code === 1) {
                 message.success('操作成功', 3);
                 this.setState({
@@ -336,15 +336,13 @@ class OnlineSession extends Component {
         return (
             <>
                 <PageHeader
-                    className="site-page-header-ghost-wrapper page-herder"
+                    className="site-page-header-ghost-wrapper"
                     title="在线会话"
                     breadcrumb={{
                         routes: routes,
                         itemRender: itemRender
                     }}
-                    extra={[
-                        <Logout key='logout'/>
-                    ]}
+
                     subTitle="查询实时在线会话"
                 >
                 </PageHeader>
@@ -374,6 +372,7 @@ class OnlineSession extends Component {
                                         onSearch={this.handleSearchByNickname}
                                         onChange={this.handleChangeByUserId}
                                         filterOption={false}
+                                        allowClear
                                     >
                                         {userOptions}
                                     </Select>
@@ -473,9 +472,9 @@ class OnlineSession extends Component {
                     {
                         this.state.accessVisible ?
                             <Modal
-                                className='monitor'
+                                className='modal-no-padding'
                                 title={this.state.sessionTitle}
-                                centered={true}
+
                                 maskClosable={false}
                                 visible={this.state.accessVisible}
                                 footer={null}

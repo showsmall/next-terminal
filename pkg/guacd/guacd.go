@@ -34,6 +34,7 @@ const (
 	DisableOffscreenCaching  = "disable-offscreen-caching"
 	DisableGlyphCaching      = "disable-glyph-caching"
 
+	Domain        = "domain"
 	RemoteApp     = "remote-app"
 	RemoteAppDir  = "remote-app-dir"
 	RemoteAppArgs = "remote-app-args"
@@ -48,6 +49,15 @@ const (
 	PasswordRegex     = "password-regex"
 	LoginSuccessRegex = "login-success-regex"
 	LoginFailureRegex = "login-failure-regex"
+
+	Namespace  = "namespace"
+	Pod        = "pod"
+	Container  = "container"
+	UesSSL     = "use-ssl"
+	ClientCert = "client-cert"
+	ClientKey  = "client-key"
+	CaCert     = "ca-cert"
+	IgnoreCert = "ignore-cert"
 )
 
 const Delimiter = ';'
@@ -252,6 +262,9 @@ func (opt *Tunnel) Read() (p []byte, err error) {
 	//fmt.Printf("<- %v \n", string(p))
 	s := string(p)
 	if s == "rate=44100,channels=2;" {
+		return make([]byte, 0), nil
+	}
+	if s == "rate=22050,channels=2;" {
 		return make([]byte, 0), nil
 	}
 	if s == "5.audio,1.1,31.audio/L16;" {

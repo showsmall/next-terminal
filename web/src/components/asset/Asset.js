@@ -12,6 +12,7 @@ import {
     Layout,
     Menu,
     Modal,
+    notification,
     PageHeader,
     Row,
     Select,
@@ -26,19 +27,24 @@ import qs from "qs";
 import AssetModal from "./AssetModal";
 import request from "../../common/request";
 import {message} from "antd/es";
-import {isEmpty, itemRender} from "../../utils/utils";
+import {getHeaders, isEmpty, itemRender} from "../../utils/utils";
 import dayjs from 'dayjs';
 import {
     DeleteOutlined,
     DownOutlined,
     ExclamationCircleOutlined,
+    ImportOutlined,
     PlusOutlined,
     SyncOutlined,
-    UndoOutlined
+    UndoOutlined,
+    UploadOutlined
 } from '@ant-design/icons';
 import {PROTOCOL_COLORS} from "../../common/constants";
-import Logout from "../user/Logout";
+
 import {hasPermission, isAdmin} from "../../service/permission";
+import Upload from "antd/es/upload";
+import axios from "axios";
+import {server} from "../../common/env";
 
 
 const confirm = Modal.confirm;
@@ -49,6 +55,9 @@ const routes = [
     {
         path: '',
         breadcrumbName: '首页',
+    },
+    {
+        breadcrumbName: '资源管理',
     },
     {
         path: 'assets',
@@ -88,6 +97,9 @@ class Asset extends Component {
         users: [],
         selected: {},
         selectedSharers: [],
+        importModalVisible: false,
+        fileList: [],
+        uploading: false,
     };
 
     async componentDidMount() {
@@ -270,6 +282,12 @@ class Asset extends Component {
             asset['tags'] = [];
         }
 
+        asset['use-ssl'] = asset['use-ssl'] === 'true';
+
+        asset['ignore-cert'] = asset['ignore-cert'] === 'true';
+
+        console.log(asset)
+
         this.setState({
             modalTitle: title,
             modalVisible: true,
@@ -442,6 +460,16 @@ class Asset extends Component {
         });
     }
 
+    handleTableChange = (pagination, filters, sorter) => {
+        let query = {
+            ...this.state.queryParams,
+            'order': sorter.order,
+            'field': sorter.field
+        }
+
+        this.loadTableData(query);
+    }
+
     render() {
 
         const columns = [{
@@ -465,7 +493,8 @@ class Asset extends Component {
                         {short}
                     </Tooltip>
                 );
-            }
+            },
+            sorter: true,
         }, {
             title: '连接协议',
             dataIndex: 'protocol',
@@ -490,7 +519,7 @@ class Asset extends Component {
                         if (tags[i] === '-') {
                             continue;
                         }
-                        tagDocuments.push(<Tag>{tagArr[i]}</Tag>)
+                        tagDocuments.push(<Tag key={tagArr[i]}>{tagArr[i]}</Tag>)
                     }
                     return tagDocuments;
                 }
@@ -529,7 +558,8 @@ class Asset extends Component {
                         {dayjs(text).fromNow()}
                     </Tooltip>
                 )
-            }
+            },
+            sorter: true,
         },
             {
                 title: '操作',
@@ -631,15 +661,13 @@ class Asset extends Component {
         return (
             <>
                 <PageHeader
-                    className="site-page-header-ghost-wrapper page-herder"
+                    className="site-page-header-ghost-wrapper"
                     title="资产管理"
                     breadcrumb={{
                         routes: routes,
                         itemRender: itemRender
                     }}
-                    extra={[
-                        <Logout key='logout'/>
-                    ]}
+
                     subTitle="资产"
                 >
                 </PageHeader>
@@ -708,6 +736,20 @@ class Asset extends Component {
 
                                     <Divider type="vertical"/>
 
+                                    {isAdmin() ?
+                                        <Tooltip title="批量导入">
+                                            <Button type="dashed" icon={<ImportOutlined/>}
+                                                    onClick={() => {
+                                                        this.setState({
+                                                            importModalVisible: true
+                                                        })
+                                                    }}>
+
+                                            </Button>
+                                        </Tooltip> : undefined
+                                    }
+
+
                                     <Tooltip title="新增">
                                         <Button type="dashed" icon={<PlusOutlined/>}
                                                 onClick={() => this.showModal('新增资产', {})}>
@@ -767,6 +809,7 @@ class Asset extends Component {
                                showTotal: total => `总计 ${total} 条`
                            }}
                            loading={this.state.loading}
+                           onChange={this.handleTableChange}
                     />
 
                     {
@@ -784,11 +827,106 @@ class Asset extends Component {
                             : null
                     }
 
+                    {
+                        this.state.importModalVisible ?
+                            <Modal title="资产导入" visible={true}
+                                   onOk={() => {
+                                       const formData = new FormData();
+                                       formData.append("file", this.state.fileList[0]);
+
+                                       let headers = getHeaders();
+                                       headers['Content-Type'] = 'multipart/form-data';
+
+                                       axios
+                                           .post(server + "/assets/import", formData, {
+                                               headers: headers
+                                           })
+                                           .then((resp) => {
+                                               console.log("上传成功", resp);
+                                               this.setState({
+                                                   importModalVisible: false
+                                               })
+                                               let result = resp.data;
+                                               if (result['code'] === 1) {
+                                                   let data = result['data'];
+                                                   let successCount = data['successCount'];
+                                                   let errorCount = data['errorCount'];
+                                                   if (errorCount === 0) {
+                                                       notification['success']({
+                                                           message: '导入资产成功',
+                                                           description: '共导入成功' + successCount + '条资产。',
+                                                       });
+                                                   } else {
+                                                       notification['info']({
+                                                           message: '导入资产完成',
+                                                           description: `共导入成功${successCount}条资产，失败${errorCount}条资产。`,
+                                                       });
+                                                   }
+                                               } else {
+                                                   notification['error']({
+                                                       message: '导入资产失败',
+                                                       description: result['message'],
+                                                   });
+                                               }
+                                               this.loadTableData();
+                                           });
+                                   }}
+                                   onCancel={() => {
+                                       this.setState({
+                                           importModalVisible: false
+                                       })
+                                   }}
+                                   okButtonProps={{
+                                       disabled: this.state.fileList.length === 0
+                                   }}
+                            >
+                                <Space>
+                                    <Upload
+                                        maxCount={1}
+                                        onRemove={file => {
+                                            this.setState(state => {
+                                                const index = state.fileList.indexOf(file);
+                                                const newFileList = state.fileList.slice();
+                                                newFileList.splice(index, 1);
+                                                return {
+                                                    fileList: newFileList,
+                                                };
+                                            });
+                                        }}
+                                        beforeUpload={(file) => {
+                                            this.setState(state => ({
+                                                fileList: [file],
+                                            }));
+                                            return false;
+                                        }}
+                                        fileList={this.state.fileList}
+                                    >
+                                        <Button icon={<UploadOutlined/>}>选择csv文件</Button>
+                                    </Upload>
+
+                                    <Button type="primary" onClick={() => {
+
+                                        let csvString= 'name,ssh,127.0.0.1,22,username,password,privateKey,passphrase,description';
+                                        //前置的"\uFEFF"为“零宽不换行空格”，可处理中文乱码问题
+                                        const blob = new Blob(["\uFEFF" + csvString], {type: 'text/csv;charset=gb2312;'});
+                                        let a = document.createElement('a');
+                                        a.download = 'sample.csv';
+                                        a.href = URL.createObjectURL(blob);
+                                        a.click();
+                                    }}>
+                                        下载样本文件
+                                    </Button>
+                                </Space>
+
+                            </Modal>
+                            : undefined
+                    }
+
                     <Modal title={<Text>更换资源「<strong style={{color: '#1890ff'}}>{this.state.selected['name']}</strong>」的所有者
                     </Text>}
                            visible={this.state.changeOwnerModalVisible}
                            confirmLoading={this.state.changeOwnerConfirmLoading}
-                           centered={true}
+
                            onOk={() => {
                                this.setState({
                                    changeOwnerConfirmLoading: true
@@ -851,7 +989,7 @@ class Asset extends Component {
                             </Text>}
                                    visible={this.state.changeSharerModalVisible}
                                    confirmLoading={this.state.changeSharerConfirmLoading}
-                                   centered={true}
+
                                    onOk={async () => {
                                        this.setState({
                                            changeSharerConfirmLoading: true

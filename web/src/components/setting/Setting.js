@@ -3,7 +3,6 @@ import {Button, Form, Input, Layout, PageHeader, Select, Switch, Tabs, Tooltip, 
 import {itemRender} from '../../utils/utils'
 import request from "../../common/request";
 import {message} from "antd/es";
-import Logout from "../user/Logout";
 import {ExclamationCircleOutlined} from "@ant-design/icons";
 
 const {Content} = Layout;
@@ -41,7 +40,8 @@ class Setting extends Component {
     rdpSettingFormRef = React.createRef();
     sshSettingFormRef = React.createRef();
     vncSettingFormRef = React.createRef();
-    otherSettingFormRef = React.createRef();
+    guacdSettingFormRef = React.createRef();
+    mailSettingFormRef = React.createRef();
 
     componentDidMount() {
         this.getProperties();
@@ -95,8 +95,12 @@ class Setting extends Component {
                 this.vncSettingFormRef.current.setFieldsValue(properties)
             }
 
-            if (this.otherSettingFormRef.current) {
-                this.otherSettingFormRef.current.setFieldsValue(properties)
+            if (this.guacdSettingFormRef.current) {
+                this.guacdSettingFormRef.current.setFieldsValue(properties)
+            }
+
+            if (this.mailSettingFormRef.current) {
+                this.mailSettingFormRef.current.setFieldsValue(properties)
             }
         } else {
             message.error(result['message']);
@@ -111,15 +115,13 @@ class Setting extends Component {
         return (
             <>
                 <PageHeader
-                    className="site-page-header-ghost-wrapper page-herder"
+                    className="site-page-header-ghost-wrapper"
                     title="系统设置"
                     breadcrumb={{
                         routes: routes,
                         itemRender: itemRender
                     }}
-                    extra={[
-                        <Logout key='logout'/>
-                    ]}
+
                     subTitle="系统设置"
                 >
                 </PageHeader>
@@ -472,9 +474,9 @@ class Setting extends Component {
                                 </Form.Item>
                             </Form>
                         </TabPane>
-                        <TabPane tab="其他配置" key="other">
+                        <TabPane tab="Guacd服务配置" key="other">
                             <Title level={3}>Guacd 服务配置</Title>
-                            <Form ref={this.otherSettingFormRef} name="password" onFinish={this.changeProperties}
+                            <Form ref={this.guacdSettingFormRef} name="password" onFinish={this.changeProperties}
                                   layout="vertical">
                                 <Form.Item
                                     {...formItemLayout}
@@ -545,6 +547,92 @@ class Setting extends Component {
                                             </Form.Item>
                                         </> : null
                                 }
+
+                                <Form.Item
+                                    {...formItemLayout}
+                                    name="session-saved-limit"
+                                    label="会话录屏保存时长"
+                                    initialValue=""
+                                >
+                                    <Select onChange={null}>
+                                        <Option value="">永久</Option>
+                                        <Option value="30">30天</Option>
+                                        <Option value="60">60天</Option>
+                                        <Option value="180">180天</Option>
+                                        <Option value="360">360天</Option>
+                                    </Select>
+                                </Form.Item>
+
+                                <Form.Item {...formTailLayout}>
+                                    <Button type="primary" htmlType="submit">
+                                        更新
+                                    </Button>
+                                </Form.Item>
+                            </Form>
+                        </TabPane>
+                        <TabPane tab="邮箱配置" key="mail">
+                            <Title level={3}>邮箱配置</Title>
+                            <Form ref={this.mailSettingFormRef} name="password" onFinish={this.changeProperties}
+                                  layout="vertical">
+
+                                <Form.Item
+                                    {...formItemLayout}
+                                    name="mail-host"
+                                    label="邮件服务器地址"
+                                    rules={[
+                                        {
+                                            required: false,
+                                            message: '邮件服务器地址',
+                                        },
+                                    ]}
+                                >
+                                    <Input type='text' placeholder="请输入邮件服务器地址"/>
+                                </Form.Item>
+
+                                <Form.Item
+                                    {...formItemLayout}
+                                    name="mail-port"
+                                    label="邮件服务器端口"
+                                    rules={[
+                                        {
+                                            required: false,
+                                            message: '邮件服务器地址',
+                                            min: 1,
+                                            max: 65535
+                                        },
+                                    ]}
+                                >
+                                    <Input type='number' placeholder="请输入邮件服务器地址"/>
+                                </Form.Item>
+
+                                <Form.Item
+                                    {...formItemLayout}
+                                    name="mail-username"
+                                    label="邮箱账号"
+                                    rules={[
+                                        {
+                                            required: false,
+                                            type: "email",
+                                            message: '请输入正确的邮箱账号',
+                                        },
+                                    ]}
+                                >
+                                    <Input type='email' placeholder="请输入邮箱账号"/>
+                                </Form.Item>
+
+                                <Form.Item
+                                    {...formItemLayout}
+                                    name="mail-password"
+                                    label="邮箱密码"
+                                    rules={[
+                                        {
+                                            required: false,
+                                            message: '邮箱密码',
+                                        },
+                                    ]}
+                                >
+                                    <Input type='password' placeholder="请输入邮箱密码"/>
+                                </Form.Item>
 
                                 <Form.Item {...formTailLayout}>
                                     <Button type="primary" htmlType="submit">

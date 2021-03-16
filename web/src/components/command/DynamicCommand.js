@@ -34,7 +34,7 @@ import {
     UndoOutlined
 } from '@ant-design/icons';
 import {compare, itemRender} from "../../utils/utils";
-import Logout from "../user/Logout";
+
 import {hasPermission, isAdmin} from "../../service/permission";
 import dayjs from "dayjs";
 
@@ -357,6 +357,16 @@ class DynamicCommand extends Component {
         })
     }
 
+    handleTableChange = (pagination, filters, sorter) => {
+        let query = {
+            ...this.state.queryParams,
+            'order': sorter.order,
+            'field': sorter.field
+        }
+
+        this.loadTableData(query);
+    }
+
     render() {
 
         const columns = [{
@@ -380,7 +390,8 @@ class DynamicCommand extends Component {
                         {short}
                     </Tooltip>
                 );
-            }
+            },
+            sorter: true,
         }, {
             title: '指令内容',
             dataIndex: 'content',
@@ -411,7 +422,8 @@ class DynamicCommand extends Component {
                         {dayjs(text).fromNow()}
                     </Tooltip>
                 )
-            }
+            },
+            sorter: true,
         }, {
             title: '操作',
             key: 'action',
@@ -523,15 +535,13 @@ class DynamicCommand extends Component {
         return (
             <>
                 <PageHeader
-                    className="site-page-header-ghost-wrapper page-herder"
+                    className="site-page-header-ghost-wrapper"
                     title="动态指令"
                     breadcrumb={{
                         routes: routes,
                         itemRender: itemRender
                     }}
-                    extra={[
-                        <Logout key='logout'/>
-                    ]}
+
                     subTitle="批量动态指令执行"
                 >
                 </PageHeader>
@@ -632,6 +642,7 @@ class DynamicCommand extends Component {
                             showTotal: total => `总计 ${total} 条`
                         }}
                         loading={this.state.loading}
+                        onChange={this.handleTableChange}
                     />
 
                     {
@@ -652,7 +663,7 @@ class DynamicCommand extends Component {
                     <Modal
                         title="选择资产"
                         visible={this.state.assetsVisible}
-                        centered={true}
+
                         onOk={this.executeCommand}
                         onCancel={() => {
                             this.setState({
@@ -680,7 +691,7 @@ class DynamicCommand extends Component {
                     </Text>}
                            visible={this.state.changeOwnerModalVisible}
                            confirmLoading={this.state.changeOwnerConfirmLoading}
-                           centered={true}
+
                            onOk={() => {
                                this.setState({
                                    changeOwnerConfirmLoading: true
@@ -741,7 +752,7 @@ class DynamicCommand extends Component {
                                 style={{color: '#1890ff'}}>{this.state.selected['name']}</strong>」的授权人
                             </Text>}
                                    visible={this.state.changeSharerModalVisible}
-                                   centered={true}
+
                                    confirmLoading={this.state.changeSharerConfirmLoading}
                                    onOk={async () => {
                                        this.setState({

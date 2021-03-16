@@ -1,15 +1,10 @@
 package model
 
 import (
+	"next-terminal/pkg/constant"
 	"next-terminal/pkg/global"
 	"next-terminal/pkg/utils"
 )
-
-// 密码
-const Custom = "custom"
-
-// 密钥
-const PrivateKey = "private-key"
 
 type Credential struct {
 	ID         string         `gorm:"primary_key" json:"id"`
@@ -45,18 +40,18 @@ type CredentialSimpleVo struct {
 
 func FindAllCredential(account User) (o []CredentialSimpleVo, err error) {
 	db := global.DB.Table("credentials").Select("DISTINCT credentials.id,credentials.name").Joins("left join resource_sharers on credentials.id = resource_sharers.resource_id")
-	if account.Type == TypeUser {
+	if account.Type == constant.TypeUser {
 		db = db.Where("credentials.owner = ? or resource_sharers.user_id = ?", account.ID, account.ID)
 	}
 	err = db.Find(&o).Error
 	return
 }
 
-func FindPageCredential(pageIndex, pageSize int, name string, account User) (o []CredentialVo, total int64, err error) {
+func FindPageCredential(pageIndex, pageSize int, name, order, field string, account User) (o []CredentialVo, total int64, err error) {
 	db := global.DB.Table("credentials").Select("credentials.id,credentials.name,credentials.type,credentials.username,credentials.owner,credentials.created,users.nickname as owner_name,COUNT(resource_sharers.user_id) as sharer_count").Joins("left join users on credentials.owner = users.id").Joins("left join resource_sharers on credentials.id = resource_sharers.resource_id").Group("credentials.id")
 	dbCounter := global.DB.Table("credentials").Select("DISTINCT credentials.id").Joins("left join resource_sharers on credentials.id = resource_sharers.resource_id").Group("credentials.id")
 
-	if TypeUser == account.Type {
+	if constant.TypeUser == account.Type {
 		owner := account.ID
 		db = db.Where("credentials.owner = ? or resource_sharers.user_id = ?", owner, owner)
 		dbCounter = dbCounter.Where("credentials.owner = ? or resource_sharers.user_id = ?", owner, owner)
@@ -71,7 +66,20 @@ func FindPageCredential(pageIndex, pageSize int, name string, account User) (o [
 	if err != nil {
 		return nil, 0, err
 	}
-	err = db.Order("credentials.created desc").Offset((pageIndex - 1) * pageSize).Limit(pageSize).Find(&o).Error
+
+	if order == "ascend" {
+		order = "asc"
+	} else {
+		order = "desc"
+	}
+
+	if field == "name" {
+		field = "name"
+	} else {
+		field = "created"
+	}
+
+	err = db.Order("credentials." + field + " " + order).Offset((pageIndex - 1) * pageSize).Limit(pageSize).Find(&o).Error
 	if o == nil {
 		o = make([]CredentialVo, 0)
 	}

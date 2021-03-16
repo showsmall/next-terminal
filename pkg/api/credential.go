@@ -3,6 +3,7 @@ package api
 import (
 	"errors"
 	"github.com/labstack/echo/v4"
+	"next-terminal/pkg/constant"
 	"next-terminal/pkg/model"
 	"next-terminal/pkg/utils"
 	"strconv"
@@ -26,7 +27,7 @@ func CredentialCreateEndpoint(c echo.Context) error {
 	item.Created = utils.NowJsonTime()
 
 	switch item.Type {
-	case model.Custom:
+	case constant.Custom:
 		item.PrivateKey = "-"
 		item.Passphrase = "-"
 		if len(item.Username) == 0 {
@@ -35,7 +36,7 @@ func CredentialCreateEndpoint(c echo.Context) error {
 		if len(item.Password) == 0 {
 			item.Password = "-"
 		}
-	case model.PrivateKey:
+	case constant.PrivateKey:
 		item.Password = "-"
 		if len(item.Username) == 0 {
 			item.Username = "-"
@@ -62,8 +63,11 @@ func CredentialPagingEndpoint(c echo.Context) error {
 	pageSize, _ := strconv.Atoi(c.QueryParam("pageSize"))
 	name := c.QueryParam("name")
 
+	order := c.QueryParam("order")
+	field := c.QueryParam("field")
+
 	account, _ := GetCurrentAccount(c)
-	items, total, err := model.FindPageCredential(pageIndex, pageSize, name, account)
+	items, total, err := model.FindPageCredential(pageIndex, pageSize, name, order, field, account)
 	if err != nil {
 		return err
 	}
@@ -87,7 +91,7 @@ func CredentialUpdateEndpoint(c echo.Context) error {
 	}
 
 	switch item.Type {
-	case model.Custom:
+	case constant.Custom:
 		item.PrivateKey = "-"
 		item.Passphrase = "-"
 		if len(item.Username) == 0 {
@@ -96,7 +100,7 @@ func CredentialUpdateEndpoint(c echo.Context) error {
 		if len(item.Password) == 0 {
 			item.Password = "-"
 		}
-	case model.PrivateKey:
+	case constant.PrivateKey:
 		item.Password = "-"
 		if len(item.Username) == 0 {
 			item.Username = "-"
@@ -137,6 +141,9 @@ func CredentialDeleteEndpoint(c echo.Context) error {
 
 func CredentialGetEndpoint(c echo.Context) error {
 	id := c.Param("id")
+	if err := PreCheckCredentialPermission(c, id); err != nil {
+		return err
+	}
 
 	item, err := model.FindCredentialById(id)
 	if err != nil {

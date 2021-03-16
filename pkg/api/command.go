@@ -34,7 +34,10 @@ func CommandPagingEndpoint(c echo.Context) error {
 	content := c.QueryParam("content")
 	account, _ := GetCurrentAccount(c)
 
-	items, total, err := model.FindPageCommand(pageIndex, pageSize, name, content, account)
+	order := c.QueryParam("order")
+	field := c.QueryParam("field")
+
+	items, total, err := model.FindPageCommand(pageIndex, pageSize, name, content, order, field, account)
 	if err != nil {
 		return err
 	}
@@ -81,6 +84,11 @@ func CommandDeleteEndpoint(c echo.Context) error {
 
 func CommandGetEndpoint(c echo.Context) (err error) {
 	id := c.Param("id")
+
+	if err := PreCheckCommandPermission(c, id); err != nil {
+		return err
+	}
+
 	var item model.Command
 	if item, err = model.FindCommandById(id); err != nil {
 		return err

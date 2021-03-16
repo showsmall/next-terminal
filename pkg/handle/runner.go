@@ -1,8 +1,8 @@
 package handle
 
 import (
-	"github.com/robfig/cron/v3"
 	"github.com/sirupsen/logrus"
+	"next-terminal/pkg/constant"
 	"next-terminal/pkg/guacd"
 	"next-terminal/pkg/model"
 	"next-terminal/pkg/utils"
@@ -13,45 +13,67 @@ import (
 
 func RunTicker() {
 
-	c := cron.New(cron.WithSeconds()) //精确到秒
-
-	_, _ = c.AddFunc("0 0 0/1 * * ?", func() {
-		// 定时任务，每隔一小时删除一次未使用的会话信息
-		sessions, _ := model.FindSessionByStatusIn([]string{model.NoConnect, model.Connecting})
-		if sessions != nil && len(sessions) > 0 {
-			now := time.Now()
-			for i := range sessions {
-				if now.Sub(sessions[i].ConnectedTime.Time) > time.Hour*1 {
-					model.DeleteSessionById(sessions[i].ID)
-					s := sessions[i].Username + "@" + sessions[i].IP + ":" + strconv.Itoa(sessions[i].Port)
-					logrus.Infof("会话「%v」ID「%v」超过1小时未打开，已删除。", s, sessions[i].ID)
+	// 每隔一小时删除一次未使用的会话信息
+	unUsedSessionTicker := time.NewTicker(time.Minute * 60)
+	go func() {
+		for range unUsedSessionTicker.C {
+			sessions, _ := model.FindSessionByStatusIn([]string{constant.NoConnect, constant.Connecting})
+			if sessions != nil && len(sessions) > 0 {
+				now := time.Now()
+				for i := range sessions {
+					if now.Sub(sessions[i].ConnectedTime.Time) > time.Hour*1 {
+						_ = model.DeleteSessionById(sessions[i].ID)
+						s := sessions[i].Username + "@" + sessions[i].IP + ":" + strconv.Itoa(sessions[i].Port)
+						logrus.Infof("会话「%v」ID「%v」超过1小时未打开，已删除。", s, sessions[i].ID)
+					}
 				}
 			}
 		}
-		// 每隔一小时检测一次资产是否存活
-		assets, _ := model.FindAllAsset()
-		if assets != nil && len(assets) > 0 {
-			for i := range assets {
-				asset := assets[i]
-				active := utils.Tcping(asset.IP, asset.Port)
-				model.UpdateAssetActiveById(active, asset.ID)
-				logrus.Infof("资产「%v」ID「%v」存活状态检测完成，存活「%v」。", asset.Name, asset.ID, active)
+	}()
+
+	// 每日凌晨删除超过时长限制的会话
+	timeoutSessionTicker := time.NewTicker(time.Hour * 24)
+	go func() {
+		for range timeoutSessionTicker.C {
+			property, err := model.FindPropertyByName("session-saved-limit")
+			if err != nil {
+				return
+			}
+			if property.Value == "" || property.Value == "-" {
+				return
+			}
+			limit, err := strconv.Atoi(property.Value)
+			if err != nil {
+				return
+			}
+			sessions, err := model.FindOutTimeSessions(limit)
+			if err != nil {
+				return
+			}
+
+			if sessions != nil && len(sessions) > 0 {
+				var sessionIds []string
+				for i := range sessions {
+					sessionIds = append(sessionIds, sessions[i].ID)
+				}
+				err := model.DeleteSessionByIds(sessionIds)
+				if err != nil {
+					logrus.Errorf("删除离线会话失败 %v", err)
+				}
 			}
 		}
-	})
-
-	c.Start()
+	}()
 }
 
 func RunDataFix() {
-	sessions, _ := model.FindSessionByStatus(model.Connected)
+	sessions, _ := model.FindSessionByStatus(constant.Connected)
 	if sessions == nil {
 		return
 	}
 
 	for i := range sessions {
 		session := model.Session{
-			Status:           model.Disconnected,
+			Status:           constant.Disconnected,
 			DisconnectedTime: utils.NowJsonTime(),
 		}
 

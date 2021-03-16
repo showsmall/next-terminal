@@ -33,7 +33,7 @@ import {
     UndoOutlined
 } from '@ant-design/icons';
 import {itemRender} from "../../utils/utils";
-import Logout from "../user/Logout";
+
 import {hasPermission, isAdmin} from "../../service/permission";
 import dayjs from "dayjs";
 
@@ -324,6 +324,16 @@ class Credential extends Component {
         })
     }
 
+    handleTableChange = (pagination, filters, sorter) => {
+        let query = {
+            ...this.state.queryParams,
+            'order': sorter.order,
+            'field': sorter.field
+        }
+
+        this.loadTableData(query);
+    }
+
     render() {
 
         const columns = [{
@@ -347,7 +357,8 @@ class Credential extends Component {
                         {short}
                     </Tooltip>
                 );
-            }
+            },
+            sorter: true,
         }, {
             title: '凭证类型',
             dataIndex: 'type',
@@ -382,7 +393,8 @@ class Credential extends Component {
                         {dayjs(text).fromNow()}
                     </Tooltip>
                 )
-            }
+            },
+            sorter: true,
         },
             {
                 title: '操作',
@@ -472,15 +484,13 @@ class Credential extends Component {
         return (
             <>
                 <PageHeader
-                    className="site-page-header-ghost-wrapper page-herder"
+                    className="site-page-header-ghost-wrapper"
                     title="授权凭证"
                     breadcrumb={{
                         routes: routes,
                         itemRender: itemRender
                     }}
-                    extra={[
-                        <Logout key='logout'/>
-                    ]}
+
                     subTitle="访问资产的账户、密钥等"
                 >
                 </PageHeader>
@@ -574,6 +584,7 @@ class Credential extends Component {
                             showTotal: total => `总计 ${total} 条`
                         }}
                         loading={this.state.loading}
+                        onChange={this.handleTableChange}
                     />
 
                     {
@@ -595,7 +606,7 @@ class Credential extends Component {
                     </Text>}
                            visible={this.state.changeOwnerModalVisible}
                            confirmLoading={this.state.changeOwnerConfirmLoading}
-                           centered={true}
+
                            onOk={() => {
                                this.setState({
                                    changeOwnerConfirmLoading: true
@@ -654,7 +665,7 @@ class Credential extends Component {
                             </Text>}
                                    visible={this.state.changeSharerModalVisible}
                                    confirmLoading={this.state.changeSharerConfirmLoading}
-                                   centered={true}
+
                                    onOk={async () => {
                                        this.setState({
                                            changeSharerConfirmLoading: true

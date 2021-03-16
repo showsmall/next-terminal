@@ -23,7 +23,7 @@ import Playback from "./Playback";
 import {message} from "antd/es";
 import {DeleteOutlined, ExclamationCircleOutlined, SyncOutlined, UndoOutlined} from "@ant-design/icons";
 import {PROTOCOL_COLORS} from "../../common/constants";
-import Logout from "../user/Logout";
+
 import dayjs from "dayjs";
 
 const confirm = Modal.confirm;
@@ -290,6 +290,30 @@ class OfflineSession extends Component {
                             <Button type="link" size='small'
                                     disabled={disabled}
                                     onClick={() => this.showPlayback(record)}>回放</Button>
+                            <Button type="link" size='small'
+                                    onClick={() => {
+                                        confirm({
+                                            title: '您确定要禁止该IP访问本系统吗?',
+                                            content: '',
+                                            okText: '确定',
+                                            okType: 'danger',
+                                            cancelText: '取消',
+                                            onOk: async () => {
+                                                // 向后台提交数据
+                                                let formData = {
+                                                    ip: record['clientIp'],
+                                                    rule: 'reject',
+                                                    priority: 99,
+                                                }
+                                                const result = await request.post('/securities', formData);
+                                                if (result.code === 1) {
+                                                    message.success('禁用成功');
+                                                } else {
+                                                    message.error('禁用失败 :( ' + result.message, 10);
+                                                }
+                                            }
+                                        });
+                                    }}>禁用IP</Button>
                             <Button type="link" size='small' onClick={() => {
                                 confirm({
                                     title: '您确定要删除此会话吗?',
@@ -342,15 +366,13 @@ class OfflineSession extends Component {
         return (
             <>
                 <PageHeader
-                    className="site-page-header-ghost-wrapper page-herder"
+                    className="site-page-header-ghost-wrapper"
                     title="离线会话"
                     breadcrumb={{
                         routes: routes,
                         itemRender: itemRender
                     }}
-                    extra={[
-                        <Logout key='logout'/>
-                    ]}
+
                     subTitle="离线会话管理"
                 >
                 </PageHeader>
@@ -379,6 +401,7 @@ class OfflineSession extends Component {
                                         onSearch={this.handleSearchByNickname}
                                         onChange={this.handleChangeByUserId}
                                         filterOption={false}
+                                        allowClear
                                     >
                                         {userOptions}
                                     </Select>
@@ -477,9 +500,9 @@ class OfflineSession extends Component {
                     {
                         this.state.playbackVisible ?
                             <Modal
-                                className='monitor'
-                                title="会话回放"
-                                centered={true}
+                                className='modal-no-padding'
+                                title={`会话回放 来源IP：${this.state.selectedRow['clientIp']} 用户昵称：${this.state.selectedRow['creatorName']} 资产名称：${this.state.selectedRow['assetName']} 网络：${this.state.selectedRow['username']}@${this.state.selectedRow['ip']}:${this.state.selectedRow['port']}`}
+
                                 visible={this.state.playbackVisible}
                                 onCancel={this.hidePlayback}
                                 width={window.innerWidth * 0.8}
@@ -497,7 +520,7 @@ class OfflineSession extends Component {
                                                 overflow: 'visible'
                                             }}
                                             onLoad={() => {
-                                                // const obj = ReactDOM.findDOMNode(this);
+                                                // constant obj = ReactDOM.findDOMNode(this);
                                                 // this.setState({
                                                 //     "iFrameHeight": obj.contentWindow.document.body.scrollHeight + 'px'
                                                 // });

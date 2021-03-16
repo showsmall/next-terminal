@@ -6,7 +6,6 @@ import qs from "qs";
 import request from "../../common/request";
 import {message} from "antd/es";
 import {DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, SyncOutlined, UndoOutlined} from '@ant-design/icons';
-import Logout from "./Logout";
 import UserGroupModal from "./UserGroupModal";
 import UserShareAsset from "./UserShareAsset";
 import dayjs from "dayjs";
@@ -259,6 +258,16 @@ class UserGroup extends Component {
         })
     }
 
+    handleTableChange = (pagination, filters, sorter) => {
+        let query = {
+            ...this.state.queryParams,
+            'order': sorter.order,
+            'field': sorter.field
+        }
+
+        this.loadTableData(query);
+    }
+
     render() {
 
         const columns = [{
@@ -271,6 +280,7 @@ class UserGroup extends Component {
         }, {
             title: '名称',
             dataIndex: 'name',
+            sorter: true,
         }, {
             title: '授权资产',
             dataIndex: 'assetCount',
@@ -293,7 +303,8 @@ class UserGroup extends Component {
                         {dayjs(text).fromNow()}
                     </Tooltip>
                 )
-            }
+            },
+            sorter: true,
         },
             {
                 title: '操作',
@@ -324,15 +335,13 @@ class UserGroup extends Component {
         return (
             <>
                 <PageHeader
-                    className="site-page-header-ghost-wrapper page-herder"
+                    className="site-page-header-ghost-wrapper"
                     title="用户组管理"
                     breadcrumb={{
                         routes: routes,
                         itemRender: itemRender
                     }}
-                    extra={[
-                        <Logout key='logout'/>
-                    ]}
+
                     subTitle="平台用户管理"
                 >
                 </PageHeader>
@@ -422,6 +431,7 @@ class UserGroup extends Component {
                                showTotal: total => `总计 ${total} 条`
                            }}
                            loading={this.state.loading}
+                           onChange={this.handleTableChange}
                     />
 
                     {/* 为了屏蔽ant modal 关闭后数据仍然遗留的问题*/}
@@ -443,7 +453,7 @@ class UserGroup extends Component {
                         title='已授权资产'
                         visible={this.state.assetVisible}
                         maskClosable={false}
-                        centered={true}
+
                         destroyOnClose={true}
                         onOk={() => {
 

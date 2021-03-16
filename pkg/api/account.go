@@ -46,19 +46,35 @@ func LoginEndpoint(c echo.Context) error {
 	}
 
 	user, err := model.FindUserByUsername(loginAccount.Username)
+
+	// 存储登录失败次数信息
+	loginFailCountKey := loginAccount.Username
+	v, ok := global.Cache.Get(loginFailCountKey)
+	if !ok {
+		v = 1
+	}
+	count := v.(int)
+	if count >= 5 {
+		return Fail(c, -1, "登录失败次数过多，请稍后再试")
+	}
+
 	if err != nil {
-		return Fail(c, -1, "您输入的账号或密码不正确")
+		count++
+		global.Cache.Set(loginFailCountKey, count, time.Minute*time.Duration(5))
+		return FailWithData(c, -1, "您输入的账号或密码不正确", count)
 	}
 
 	if err := utils.Encoder.Match([]byte(user.Password), []byte(loginAccount.Password)); err != nil {
-		return Fail(c, -1, "您输入的账号或密码不正确")
+		count++
+		global.Cache.Set(loginFailCountKey, count, time.Minute*time.Duration(5))
+		return FailWithData(c, -1, "您输入的账号或密码不正确", count)
 	}
 
 	if user.TOTPSecret != "" && user.TOTPSecret != "-" {
 		return Fail(c, 0, "")
 	}
 
-	token, err := Login(c, loginAccount, user)
+	token, err := LoginSuccess(c, loginAccount, user)
 	if err != nil {
 		return err
 	}
@@ -66,7 +82,7 @@ func LoginEndpoint(c echo.Context) error {
 	return Success(c, token)
 }
 
-func Login(c echo.Context, loginAccount LoginAccount, user model.User) (token string, err error) {
+func LoginSuccess(c echo.Context, loginAccount LoginAccount, user model.User) (token string, err error) {
 	token = strings.Join([]string{utils.UUID(), utils.UUID(), utils.UUID(), utils.UUID()}, "")
 
 	authorization := Authorization{
@@ -75,11 +91,13 @@ func Login(c echo.Context, loginAccount LoginAccount, user model.User) (token st
 		User:     user,
 	}
 
+	cacheKey := BuildCacheKeyByToken(token)
+
 	if authorization.Remember {
 		// 记住登录有效期两周
-		global.Cache.Set(token, authorization, RememberEffectiveTime)
+		global.Cache.Set(cacheKey, authorization, RememberEffectiveTime)
 	} else {
-		global.Cache.Set(token, authorization, NotRememberEffectiveTime)
+		global.Cache.Set(cacheKey, authorization, NotRememberEffectiveTime)
 	}
 
 	// 保存登录日志
@@ -101,26 +119,53 @@ func Login(c echo.Context, loginAccount LoginAccount, user model.User) (token st
 	return token, nil
 }
 
+func BuildCacheKeyByToken(token string) string {
+	cacheKey := strings.Join([]string{Token, token}, ":")
+	return cacheKey
+}
+
+func GetTokenFormCacheKey(cacheKey string) string {
+	token := strings.Split(cacheKey, ":")[1]
+	return token
+}
+
 func loginWithTotpEndpoint(c echo.Context) error {
 	var loginAccount LoginAccount
 	if err := c.Bind(&loginAccount); err != nil {
 		return err
 	}
 
+	// 存储登录失败次数信息
+	loginFailCountKey := loginAccount.Username
+	v, ok := global.Cache.Get(loginFailCountKey)
+	if !ok {
+		v = 1
+	}
+	count := v.(int)
+	if count >= 5 {
+		return Fail(c, -1, "登录失败次数过多，请稍后再试")
+	}
+
 	user, err := model.FindUserByUsername(loginAccount.Username)
 	if err != nil {
-		return Fail(c, -1, "您输入的账号或密码不正确")
+		count++
+		global.Cache.Set(loginFailCountKey, count, time.Minute*time.Duration(5))
+		return FailWithData(c, -1, "您输入的账号或密码不正确", count)
 	}
 
 	if err := utils.Encoder.Match([]byte(user.Password), []byte(loginAccount.Password)); err != nil {
-		return Fail(c, -1, "您输入的账号或密码不正确")
+		count++
+		global.Cache.Set(loginFailCountKey, count, time.Minute*time.Duration(5))
+		return FailWithData(c, -1, "您输入的账号或密码不正确", count)
 	}
 
 	if !totp.Validate(loginAccount.TOTP, user.TOTPSecret) {
-		return Fail(c, -2, "您的TOTP不匹配")
+		count++
+		global.Cache.Set(loginFailCountKey, count, time.Minute*time.Duration(5))
+		return FailWithData(c, -1, "您输入双因素认证授权码不正确", count)
 	}
 
-	token, err := Login(c, loginAccount, user)
+	token, err := LoginSuccess(c, loginAccount, user)
 	if err != nil {
 		return err
 	}
@@ -130,12 +175,19 @@ func loginWithTotpEndpoint(c echo.Context) error {
 
 func LogoutEndpoint(c echo.Context) error {
 	token := GetToken(c)
-	global.Cache.Delete(token)
-	model.Logout(token)
+	cacheKey := BuildCacheKeyByToken(token)
+	global.Cache.Delete(cacheKey)
+	err := model.Logout(token)
+	if err != nil {
+		return err
+	}
 	return Success(c, nil)
 }
 
 func ConfirmTOTPEndpoint(c echo.Context) error {
+	if global.Config.Demo {
+		return Fail(c, 0, "演示模式禁止开启两步验证")
+	}
 	account, _ := GetCurrentAccount(c)
 
 	var confirmTOTP ConfirmTOTP
@@ -193,6 +245,9 @@ func ResetTOTPEndpoint(c echo.Context) error {
 }
 
 func ChangePasswordEndpoint(c echo.Context) error {
+	if global.Config.Demo {
+		return Fail(c, 0, "演示模式禁止修改密码")
+	}
 	account, _ := GetCurrentAccount(c)
 
 	var changePassword ChangePassword

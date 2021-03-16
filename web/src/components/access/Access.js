@@ -151,19 +151,15 @@ class Access extends Component {
                 this.onWindowResize(null);
                 message.destroy();
                 message.success('连接成功');
-                console.log('requestAudioStream')
-                this.requestAudioStream();
                 // 向后台发送请求，更新会话的状态
                 this.updateSessionStatus(this.state.sessionId).then(_ => {
                 })
                 break;
             case STATE_DISCONNECTING:
-                message.destroy();
-                message.loading('正在关闭连接...', 0);
+
                 break;
             case STATE_DISCONNECTED:
-                message.destroy();
-                message.error('连接关闭');
+
                 break;
             default:
                 break;
@@ -314,9 +310,6 @@ class Access extends Component {
     };
 
     onKeyDown = (keysym) => {
-        // if (this.state.clipboardVisible || this.state.fileSystemVisible) {
-        //     return true;
-        // }
         this.state.client.sendKeyEvent(1, keysym);
         if (keysym === 65288) {
             return false;
@@ -342,7 +335,9 @@ class Access extends Component {
                 fullScreenBtnText: '退出全屏'
             })
         }
-
+        if (this.state.sink) {
+            this.state.sink.focus();
+        }
     }
 
     async createSession(assetsId) {
@@ -426,6 +421,7 @@ class Access extends Component {
 
         const sink = new Guacamole.InputSink();
         display.appendChild(sink.getElement());
+        sink.focus();
 
         // Keyboard
         const keyboard = new Guacamole.Keyboard(sink.getElement());
@@ -530,24 +526,6 @@ class Access extends Component {
         }
     }
 
-    requestAudioStream = () => {
-        let client = this.state.client;
-        // Create new audio stream, associating it with an AudioRecorder
-        const stream = client.createAudioStream('audio/L16;rate=44100,channels=2');
-        const recorder = Guacamole.AudioRecorder.getInstance(stream, 'audio/L16;rate=44100,channels=2');
-
-        // If creation of the AudioRecorder failed, simply end the stream
-        if (!recorder)
-            stream.sendEnd();
-
-            // Otherwise, ensure that another audio stream is created after this
-        // audio stream is closed
-        else
-            recorder.onclose = () => {
-                console.log('audio closed')
-            };
-    }
-
     render() {
 
         const menu = (
@@ -582,19 +560,21 @@ class Access extends Component {
 
                 <Draggable>
                     <Affix style={{position: 'absolute', top: 50, right: 100}}>
-                        <Button icon={<ExpandOutlined/>} onClick={() => {
-                            this.fullScreen();
-                        }}/>
+                        <Button icon={<ExpandOutlined/>} disabled={this.state.clientState !== STATE_CONNECTED}
+                                onClick={() => {
+                                    this.fullScreen();
+                                }}/>
                     </Affix>
                 </Draggable>
 
                 <Draggable>
                     <Affix style={{position: 'absolute', top: 50, right: 150}}>
-                        <Button icon={<CopyTwoTone/>} onClick={() => {
-                            this.setState({
-                                clipboardVisible: true
-                            });
-                        }}/>
+                        <Button icon={<CopyTwoTone/>} disabled={this.state.clientState !== STATE_CONNECTED}
+                                onClick={() => {
+                                    this.setState({
+                                        clipboardVisible: true
+                                    });
+                                }}/>
                     </Affix>
                 </Draggable>
 
@@ -603,7 +583,8 @@ class Access extends Component {
                         <>
                             <Draggable>
                                 <Affix style={{position: 'absolute', top: 100, right: 100}}>
-                                    <Button icon={<AppstoreTwoTone/>} onClick={() => {
+                                    <Button icon={<AppstoreTwoTone/>}
+                                            disabled={this.state.clientState !== STATE_CONNECTED} onClick={() => {
                                         this.setState({
                                             fileSystemVisible: true,
                                         });
@@ -614,7 +595,8 @@ class Access extends Component {
                             <Draggable>
                                 <Affix style={{position: 'absolute', top: 100, right: 150}}>
                                     <Dropdown overlay={menu} trigger={['click']} placement="bottomLeft">
-                                        <Button icon={<DesktopOutlined/>}/>
+                                        <Button icon={<DesktopOutlined/>}
+                                                disabled={this.state.clientState !== STATE_CONNECTED}/>
                                     </Dropdown>
                                 </Affix>
                             </Draggable>
@@ -626,7 +608,8 @@ class Access extends Component {
                         <>
                             <Draggable>
                                 <Affix style={{position: 'absolute', top: 100, right: 100}}>
-                                    <Button icon={<AppstoreTwoTone/>} onClick={() => {
+                                    <Button icon={<AppstoreTwoTone/>}
+                                            disabled={this.state.clientState !== STATE_CONNECTED} onClick={() => {
                                         this.setState({
                                             fileSystemVisible: true,
                                         });
@@ -669,7 +652,7 @@ class Access extends Component {
                             title="剪贴板"
                             maskClosable={false}
                             visible={this.state.clipboardVisible}
-                            centered={true}
+
                             onOk={() => {
                                 this.clipboardFormRef.current
                                     .validateFields()

@@ -15,7 +15,6 @@ const UserModal = ({title, visible, handleOk, handleCancel, confirmLoading, mode
             title={title}
             visible={visible}
             maskClosable={false}
-            centered={true}
             onOk={() => {
                 form
                     .validateFields()
@@ -50,6 +49,10 @@ const UserModal = ({title, visible, handleOk, handleCancel, confirmLoading, mode
                         <Radio value={'user'}>普通用户</Radio>
                         <Radio value={'admin'}>管理用户</Radio>
                     </Radio.Group>
+                </Form.Item>
+
+                <Form.Item label="邮箱账号" name="mail" rules={[{required: false, type: "email", message: '请输入正确的邮箱账号',},]}>
+                    <Input type='email' placeholder="请输入邮箱账号"/>
                 </Form.Item>
 
                 {

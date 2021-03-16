@@ -10,6 +10,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"next-terminal/pkg/constant"
 	"next-terminal/pkg/global"
 	"next-terminal/pkg/model"
 	"next-terminal/pkg/utils"
@@ -36,20 +37,18 @@ func SessionPagingEndpoint(c echo.Context) error {
 	}
 
 	for i := 0; i < len(items); i++ {
-		if status == model.Disconnected && len(items[i].Recording) > 0 {
+		if status == constant.Disconnected && len(items[i].Recording) > 0 {
 
 			var recording string
-			if items[i].Mode == model.Naive {
+			if items[i].Mode == constant.Naive {
 				recording = items[i].Recording
 			} else {
 				recording = items[i].Recording + "/recording"
 			}
 
 			if utils.FileExists(recording) {
-				logrus.Debugf("检测到录屏文件[%v]存在", recording)
 				items[i].Recording = "1"
 			} else {
-				logrus.Warnf("检测到录屏文件[%v]不存在", recording)
 				items[i].Recording = "0"
 			}
 		} else {
@@ -66,15 +65,9 @@ func SessionPagingEndpoint(c echo.Context) error {
 func SessionDeleteEndpoint(c echo.Context) error {
 	sessionIds := c.Param("id")
 	split := strings.Split(sessionIds, ",")
-	for i := range split {
-		drivePath, err := model.GetRecordingPath()
-		if err != nil {
-			continue
-		}
-		if err := os.RemoveAll(path.Join(drivePath, split[i])); err != nil {
-			return err
-		}
-		model.DeleteSessionById(split[i])
+	err := model.DeleteSessionByIds(split)
+	if err != nil {
+		return err
 	}
 
 	return Success(c, nil)
@@ -85,7 +78,7 @@ func SessionConnectEndpoint(c echo.Context) error {
 
 	session := model.Session{}
 	session.ID = sessionId
-	session.Status = model.Connected
+	session.Status = constant.Connected
 	session.ConnectedTime = utils.NowJsonTime()
 
 	if err := model.UpdateSessionById(&session, sessionId); err != nil {
@@ -126,19 +119,19 @@ func CloseSessionById(sessionId string, code int, reason string) {
 		return
 	}
 
-	if s.Status == model.Disconnected {
+	if s.Status == constant.Disconnected {
 		return
 	}
 
-	if s.Status == model.Connecting {
+	if s.Status == constant.Connecting {
 		// 会话还未建立成功，无需保留数据
-		model.DeleteSessionById(sessionId)
+		_ = model.DeleteSessionById(sessionId)
 		return
 	}
 
 	session := model.Session{}
 	session.ID = sessionId
-	session.Status = model.Disconnected
+	session.Status = constant.Disconnected
 	session.DisconnectedTime = utils.NowJsonTime()
 	session.Code = code
 	session.Message = reason
@@ -169,15 +162,15 @@ func SessionCreateEndpoint(c echo.Context) error {
 	assetId := c.QueryParam("assetId")
 	mode := c.QueryParam("mode")
 
-	if mode == model.Naive {
-		mode = model.Naive
+	if mode == constant.Naive {
+		mode = constant.Naive
 	} else {
-		mode = model.Guacd
+		mode = constant.Guacd
 	}
 
 	user, _ := GetCurrentAccount(c)
 
-	if model.TypeUser == user.Type {
+	if constant.TypeUser == user.Type {
 		// 检测是否有访问权限
 		assetIds, err := model.FindAssetIdsByUserId(user.ID)
 		if err != nil {
@@ -204,7 +197,7 @@ func SessionCreateEndpoint(c echo.Context) error {
 		Protocol:   asset.Protocol,
 		IP:         asset.IP,
 		Port:       asset.Port,
-		Status:     model.NoConnect,
+		Status:     constant.NoConnect,
 		Creator:    user.ID,
 		ClientIP:   c.RealIP(),
 		Mode:       mode,
@@ -216,7 +209,7 @@ func SessionCreateEndpoint(c echo.Context) error {
 			return err
 		}
 
-		if credential.Type == model.Custom {
+		if credential.Type == constant.Custom {
 			session.Username = credential.Username
 			session.Password = credential.Password
 		} else {
@@ -279,6 +272,12 @@ func SessionUploadEndpoint(c echo.Context) error {
 		}
 		return Success(c, nil)
 	} else if "rdp" == session.Protocol {
+
+		if strings.Contains(remoteFile, "../") {
+			SafetyRuleTrigger(c)
+			return Fail(c, -1, ":) 您的IP已被记录，请去向管理员自首。")
+		}
+
 		drivePath, err := model.GetDrivePath()
 		if err != nil {
 			return err
@@ -332,11 +331,14 @@ func SessionDownloadEndpoint(c echo.Context) error {
 
 		return c.Stream(http.StatusOK, echo.MIMEOctetStream, bytes.NewReader(buff.Bytes()))
 	} else if "rdp" == session.Protocol {
+		if strings.Contains(remoteFile, "../") {
+			SafetyRuleTrigger(c)
+			return Fail(c, -1, ":) 您的IP已被记录，请去向管理员自首。")
+		}
 		drivePath, err := model.GetDrivePath()
 		if err != nil {
 			return err
 		}
-
 		return c.Attachment(path.Join(drivePath, remoteFile), filenameWithSuffix)
 	}
 
@@ -411,6 +413,10 @@ func SessionLsEndpoint(c echo.Context) error {
 
 		return Success(c, files)
 	} else if "rdp" == session.Protocol {
+		if strings.Contains(remoteDir, "../") {
+			SafetyRuleTrigger(c)
+			return Fail(c, -1, ":) 您的IP已被记录，请去向管理员自首。")
+		}
 		drivePath, err := model.GetDrivePath()
 		if err != nil {
 			return err
@@ -441,6 +447,18 @@ func SessionLsEndpoint(c echo.Context) error {
 	return errors.New("当前协议不支持此操作")
 }
 
+func SafetyRuleTrigger(c echo.Context) {
+	logrus.Warnf("IP %v 尝试进行攻击，请ban掉此IP", c.RealIP())
+	security := model.AccessSecurity{
+		ID:     utils.UUID(),
+		Source: "安全规则触发",
+		IP:     c.RealIP(),
+		Rule:   constant.AccessRuleReject,
+	}
+
+	_ = model.CreateNewSecurity(&security)
+}
+
 func SessionMkDirEndpoint(c echo.Context) error {
 	sessionId := c.Param("id")
 	session, err := model.FindSessionById(sessionId)
@@ -458,6 +476,10 @@ func SessionMkDirEndpoint(c echo.Context) error {
 		}
 		return Success(c, nil)
 	} else if "rdp" == session.Protocol {
+		if strings.Contains(remoteDir, "../") {
+			SafetyRuleTrigger(c)
+			return Fail(c, -1, ":) 您的IP已被记录，请去向管理员自首。")
+		}
 		drivePath, err := model.GetDrivePath()
 		if err != nil {
 			return err
@@ -515,6 +537,10 @@ func SessionRmEndpoint(c echo.Context) error {
 
 		return Success(c, nil)
 	} else if "rdp" == session.Protocol {
+		if strings.Contains(key, "../") {
+			SafetyRuleTrigger(c)
+			return Fail(c, -1, ":) 您的IP已被记录，请去向管理员自首。")
+		}
 		drivePath, err := model.GetDrivePath()
 		if err != nil {
 			return err
@@ -552,6 +578,10 @@ func SessionRenameEndpoint(c echo.Context) error {
 
 		return Success(c, nil)
 	} else if "rdp" == session.Protocol {
+		if strings.Contains(oldName, "../") {
+			SafetyRuleTrigger(c)
+			return Fail(c, -1, ":) 您的IP已被记录，请去向管理员自首。")
+		}
 		drivePath, err := model.GetDrivePath()
 		if err != nil {
 			return err
@@ -574,7 +604,7 @@ func SessionRecordingEndpoint(c echo.Context) error {
 	}
 
 	var recording string
-	if session.Mode == model.Naive {
+	if session.Mode == constant.Naive {
 		recording = session.Recording
 	} else {
 		recording = session.Recording + "/recording"

@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"next-terminal/pkg/constant"
 	"next-terminal/pkg/global"
 	"next-terminal/pkg/log"
 	"next-terminal/pkg/model"
@@ -34,6 +35,7 @@ func SetupRoutes() *echo.Echo {
 		AllowMethods: []string{http.MethodGet, http.MethodHead, http.MethodPut, http.MethodPatch, http.MethodPost, http.MethodDelete},
 	}))
 	e.Use(ErrorHandler)
+	e.Use(TcpWall)
 	e.Use(Auth)
 
 	e.POST("/login", LoginEndpoint)
@@ -71,10 +73,11 @@ func SetupRoutes() *echo.Echo {
 		//userGroups.DELETE("/:id/members/:memberId", UserGroupDelMembersEndpoint)
 	}
 
-	assets := e.Group("/assets", Auth)
+	assets := e.Group("/assets")
 	{
 		assets.GET("", AssetAllEndpoint)
 		assets.POST("", AssetCreateEndpoint)
+		assets.POST("/import", Admin(AssetImportEndpoint))
 		assets.GET("/paging", AssetPagingEndpoint)
 		assets.POST("/:id/tcping", AssetTcpingEndpoint)
 		assets.PUT("/:id", AssetUpdateEndpoint)
@@ -110,7 +113,7 @@ func SetupRoutes() *echo.Echo {
 	sessions := e.Group("/sessions")
 	{
 		sessions.POST("", SessionCreateEndpoint)
-		sessions.GET("/paging", SessionPagingEndpoint)
+		sessions.GET("/paging", Admin(SessionPagingEndpoint))
 		sessions.POST("/:id/connect", SessionConnectEndpoint)
 		sessions.POST("/:id/disconnect", Admin(SessionDisconnectEndpoint))
 		sessions.POST("/:id/resize", SessionResizeEndpoint)
@@ -120,7 +123,7 @@ func SetupRoutes() *echo.Echo {
 		sessions.POST("/:id/mkdir", SessionMkDirEndpoint)
 		sessions.POST("/:id/rm", SessionRmEndpoint)
 		sessions.POST("/:id/rename", SessionRenameEndpoint)
-		sessions.DELETE("/:id", SessionDeleteEndpoint)
+		sessions.DELETE("/:id", Admin(SessionDeleteEndpoint))
 		sessions.GET("/:id/recording", SessionRecordingEndpoint)
 	}
 
@@ -138,11 +141,33 @@ func SetupRoutes() *echo.Echo {
 		loginLogs.DELETE("/:id", LoginLogDeleteEndpoint)
 	}
 
-	e.GET("/properties", PropertyGetEndpoint)
+	e.GET("/properties", Admin(PropertyGetEndpoint))
 	e.PUT("/properties", Admin(PropertyUpdateEndpoint))
 
 	e.GET("/overview/counter", OverviewCounterEndPoint)
 	e.GET("/overview/sessions", OverviewSessionPoint)
+
+	jobs := e.Group("/jobs", Admin)
+	{
+		jobs.POST("", JobCreateEndpoint)
+		jobs.GET("/paging", JobPagingEndpoint)
+		jobs.PUT("/:id", JobUpdateEndpoint)
+		jobs.POST("/:id/change-status", JobChangeStatusEndpoint)
+		jobs.POST("/:id/exec", JobExecEndpoint)
+		jobs.DELETE("/:id", JobDeleteEndpoint)
+		jobs.GET("/:id", JobGetEndpoint)
+		jobs.GET("/:id/logs", JobGetLogsEndpoint)
+		jobs.DELETE("/:id/logs", JobDeleteLogsEndpoint)
+	}
+
+	securities := e.Group("/securities", Admin)
+	{
+		securities.POST("", SecurityCreateEndpoint)
+		securities.GET("/paging", SecurityPagingEndpoint)
+		securities.PUT("/:id", SecurityUpdateEndpoint)
+		securities.DELETE("/:id", SecurityDeleteEndpoint)
+		securities.GET("/:id", SecurityGetEndpoint)
+	}
 
 	return e
 }
@@ -153,6 +178,14 @@ func Fail(c echo.Context, code int, message string) error {
 	return c.JSON(200, H{
 		"code":    code,
 		"message": message,
+	})
+}
+
+func FailWithData(c echo.Context, code int, message string, data interface{}) error {
+	return c.JSON(200, H{
+		"code":    code,
+		"message": message,
+		"data":    data,
 	})
 }
 
@@ -181,7 +214,8 @@ func GetToken(c echo.Context) string {
 
 func GetCurrentAccount(c echo.Context) (model.User, bool) {
 	token := GetToken(c)
-	get, b := global.Cache.Get(token)
+	cacheKey := BuildCacheKeyByToken(token)
+	get, b := global.Cache.Get(cacheKey)
 	if b {
 		return get.(Authorization).User, true
 	}
@@ -195,7 +229,7 @@ func HasPermission(c echo.Context, owner string) bool {
 		return false
 	}
 	// 检测是否为管理人员
-	if model.TypeAdmin == account.Type {
+	if constant.TypeAdmin == account.Type {
 		return true
 	}
 	// 检测是否为所有者

@@ -28,12 +28,12 @@ import {
     DeleteOutlined,
     DownOutlined,
     ExclamationCircleOutlined,
+    InsuranceOutlined,
     LockOutlined,
     PlusOutlined,
     SyncOutlined,
     UndoOutlined
 } from '@ant-design/icons';
-import Logout from "./Logout";
 import UserShareAsset from "./UserShareAsset";
 import {hasPermission} from "../../service/permission";
 import dayjs from "dayjs";
@@ -58,6 +58,7 @@ class User extends Component {
 
     inputRefOfNickname = React.createRef();
     inputRefOfUsername = React.createRef();
+    inputRefOfMail = React.createRef();
     changePasswordFormRef = React.createRef()
 
     state = {
@@ -234,6 +235,17 @@ class User extends Component {
         this.loadTableData(query);
     };
 
+    handleSearchByMail = mail => {
+        let query = {
+            ...this.state.queryParams,
+            'pageIndex': 1,
+            'pageSize': this.state.queryParams.pageSize,
+            'mail': mail,
+        }
+
+        this.loadTableData(query);
+    };
+
     batchDelete = async () => {
         this.setState({
             delBtnLoading: true
@@ -281,6 +293,16 @@ class User extends Component {
         })
     }
 
+    handleTableChange = (pagination, filters, sorter) => {
+        let query = {
+            ...this.state.queryParams,
+            'order': sorter.order,
+            'field': sorter.field
+        }
+
+        this.loadTableData(query);
+    }
+
     render() {
 
         const columns = [{
@@ -294,10 +316,12 @@ class User extends Component {
             title: '登录账号',
             dataIndex: 'username',
             key: 'username',
+            sorter: true,
         }, {
             title: '用户昵称',
             dataIndex: 'nickname',
             key: 'nickname',
+            sorter: true,
         }, {
             title: '用户类型',
             dataIndex: 'type',
@@ -315,7 +339,22 @@ class User extends Component {
                 } else {
                     return text;
                 }
+            }
+        }, {
+            title: '邮箱',
+            dataIndex: 'mail',
+            key: 'mail',
+        }, {
+            title: '二次认证',
+            dataIndex: 'totpSecret',
+            key: 'totpSecret',
+            render: (text, record) => {
 
+                if (text === '1') {
+                    return <Tag icon={<InsuranceOutlined/>} color="success">开启</Tag>;
+                } else {
+                    return <Tag icon={<ExclamationCircleOutlined/>} color="warning">关闭</Tag>;
+                }
             }
         }, {
             title: '在线状态',
@@ -350,7 +389,8 @@ class User extends Component {
                         {dayjs(text).fromNow()}
                     </Tooltip>
                 )
-            }
+            },
+            sorter: true,
         },
             {
                 title: '操作',
@@ -381,6 +421,7 @@ class User extends Component {
                                                     let result = await request.post(`/users/${record['id']}/reset-totp`);
                                                     if (result['code'] === 1) {
                                                         message.success('操作成功', 3);
+                                                        this.loadTableData();
                                                     } else {
                                                         message.error(result['message'], 10);
                                                     }
@@ -401,7 +442,14 @@ class User extends Component {
                     return (
                         <div>
                             <Button type="link" size='small'
-                                    onClick={() => this.showModal('更新用户', record)}>编辑</Button>
+                                    onClick={async () => {
+                                        let result = await request.get(`/users/${record['id']}`);
+                                        if (result['code'] !== 1) {
+                                            message.error(result['message']);
+                                            return;
+                                        }
+                                        this.showModal('更新用户', result['data']);
+                                    }}>编辑</Button>
                             <Dropdown overlay={menu}>
                                 <Button type="link" size='small'>
                                     更多 <DownOutlined/>
@@ -425,15 +473,13 @@ class User extends Component {
         return (
             <>
                 <PageHeader
-                    className="site-page-header-ghost-wrapper page-herder"
+                    className="site-page-header-ghost-wrapper"
                     title="用户管理"
                     breadcrumb={{
                         routes: routes,
                         itemRender: itemRender
                     }}
-                    extra={[
-                        <Logout key='logout'/>
-                    ]}
+
                     subTitle="平台用户管理"
                 >
                 </PageHeader>
@@ -461,11 +507,19 @@ class User extends Component {
                                         onSearch={this.handleSearchByUsername}
                                     />
 
+                                    <Search
+                                        ref={this.inputRefOfMail}
+                                        placeholder="邮箱"
+                                        allowClear
+                                        onSearch={this.handleSearchByMail}
+                                    />
+
                                     <Tooltip title='重置查询'>
 
                                         <Button icon={<UndoOutlined/>} onClick={() => {
                                             this.inputRefOfUsername.current.setValue('');
                                             this.inputRefOfNickname.current.setValue('');
+                                            this.inputRefOfMail.current.setValue('');
                                             this.loadTableData({pageIndex: 1, pageSize: 10})
                                         }}>
 
@@ -494,7 +548,7 @@ class User extends Component {
                                     {/*            icon={<IssuesCloseOutlined/>}*/}
                                     {/*            loading={this.state.delBtnLoading}*/}
                                     {/*            onClick={() => {*/}
-                                    {/*                const content = <div>*/}
+                                    {/*                constant content = <div>*/}
                                     {/*                    您确定要启用选中的<Text style={{color: '#1890FF'}}*/}
                                     {/*                                   strong>{this.state.selectedRowKeys.length}</Text>条记录吗？*/}
                                     {/*                </div>;*/}
@@ -517,7 +571,7 @@ class User extends Component {
                                     {/*    <Button type="default" danger disabled={!hasSelected} icon={<StopOutlined/>}*/}
                                     {/*            loading={this.state.delBtnLoading}*/}
                                     {/*            onClick={() => {*/}
-                                    {/*                const content = <div>*/}
+                                    {/*                constant content = <div>*/}
                                     {/*                    您确定要禁用选中的<Text style={{color: '#1890FF'}}*/}
                                     {/*                                   strong>{this.state.selectedRowKeys.length}</Text>条记录吗？*/}
                                     {/*                </div>;*/}
@@ -578,6 +632,7 @@ class User extends Component {
                                showTotal: total => `总计 ${total} 条`
                            }}
                            loading={this.state.loading}
+                           onChange={this.handleTableChange}
                     />
 
                     {/* 为了屏蔽ant modal 关闭后数据仍然遗留的问题*/}
@@ -598,7 +653,7 @@ class User extends Component {
                         width={window.innerWidth * 0.8}
                         title='已授权资产'
                         visible={this.state.assetVisible}
-                        centered={true}
+
                         maskClosable={false}
                         destroyOnClose={true}
                         onOk={() => {
@@ -619,7 +674,7 @@ class User extends Component {
                             <Modal title="修改密码" visible={this.state.changePasswordVisible}
                                    confirmLoading={this.state.changePasswordConfirmLoading}
                                    maskClosable={false}
-                                   centered={true}
+
                                    onOk={() => {
                                        this.changePasswordFormRef.current
                                            .validateFields()
